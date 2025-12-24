@@ -91,6 +91,7 @@ export default function SendSMSPage() {
           businessName: currentBusinessName,
           reviewLink: currentReviewLink,
           shortLink: shortLink,
+          slug: slug,
         }),
       });
 

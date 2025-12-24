@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
+import { supabase } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { phoneNumber, businessName, reviewLink, shortLink } = body;
+    const { phoneNumber, businessName, reviewLink, shortLink, slug } = body;
 
     // Validate required fields
     if (!phoneNumber || !businessName) {
@@ -46,8 +47,44 @@ export async function POST(request: NextRequest) {
     // Initialize Twilio client
     const client = twilio(accountSid, authToken);
 
+    // Get slug from request or fetch from Supabase using businessName
+    let finalSlug = slug;
+    
+    // If no slug provided, try to fetch from Supabase using businessName
+    if (!finalSlug && businessName) {
+      const { data: linkData } = await supabase
+        .from("short_links")
+        .select("slug")
+        .eq("business_name", businessName)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (linkData) {
+        finalSlug = linkData.slug;
+      } else {
+        // Fallback: generate slug from businessName
+        finalSlug = businessName
+          .toLowerCase()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "");
+      }
+    }
+    
+    // Extract slug from shortLink if provided (format: /r/slug)
+    if (!finalSlug && shortLink) {
+      const match = shortLink.match(/\/r\/([^\/]+)$/);
+      if (match) {
+        finalSlug = match[1];
+      } else if (shortLink.startsWith("/r/")) {
+        finalSlug = shortLink.replace("/r/", "");
+      }
+    }
+    
     // Generate short link with proper domain
-    // Use VERCEL_URL (includes protocol) or NEXT_PUBLIC_SITE_URL or fallback to localhost
+    // Use VERCEL_URL or NEXT_PUBLIC_SITE_URL or fallback to localhost
     let domain = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     
     if (process.env.VERCEL_URL) {
@@ -55,28 +92,7 @@ export async function POST(request: NextRequest) {
       domain = `https://${process.env.VERCEL_URL}`;
     }
     
-    // Extract slug from shortLink if provided (format: /r/slug), or generate from businessName
-    let slug = "";
-    if (shortLink) {
-      const match = shortLink.match(/\/r\/([^\/]+)$/);
-      if (match) {
-        slug = match[1];
-      } else if (shortLink.startsWith("/r/")) {
-        slug = shortLink.replace("/r/", "");
-      }
-    }
-    
-    // If no slug found, generate from businessName
-    if (!slug && businessName) {
-      slug = businessName
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
-    }
-    
-    const finalShortLink = `${domain}/r/${slug}`;
+    const finalShortLink = `${domain}/r/${finalSlug}`;
 
     // Create SMS message with short link
     const message = `Hej! Tack för att du valde ${businessName}! Ge oss gärna ett omdöme här: ${finalShortLink}`;

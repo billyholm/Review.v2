@@ -26,18 +26,30 @@ export async function POST(request: NextRequest) {
     let counter = 1;
     
     while (true) {
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from("short_links")
         .select("slug")
         .eq("slug", finalSlug)
-        .single();
+        .maybeSingle();
 
-      if (!existing) {
+      // If no data found (slug is available) or error is "not found", break
+      if (!existing && (!checkError || checkError.code === "PGRST116")) {
         break; // Slug is available
+      }
+      
+      // If there's a real error (not just "not found"), log it but continue
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Error checking slug:", checkError);
       }
       
       finalSlug = `${slug}-${counter}`;
       counter++;
+      
+      // Safety check to avoid infinite loop
+      if (counter > 100) {
+        finalSlug = `${slug}-${Date.now()}`;
+        break;
+      }
     }
 
     // Insert or update the link in Supabase
