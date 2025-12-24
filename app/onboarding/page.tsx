@@ -1,22 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Lock, Info } from "lucide-react";
+import { ArrowRight, Lock, Info, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function OnboardingPage() {
   const [companyName, setCompanyName] = useState("");
   const [googleReviewsLink, setGoogleReviewsLink] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Save to localStorage or send to API
-    if (typeof window !== "undefined") {
-      localStorage.setItem("companyName", companyName);
-      localStorage.setItem("googleReviewsLink", googleReviewsLink);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Save to Supabase
+      const response = await fetch("/api/save-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessName: companyName,
+          googleReviewsLink: googleReviewsLink,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Kunde inte spara data");
+      }
+
+      // Also save to localStorage for backward compatibility
+      if (typeof window !== "undefined") {
+        localStorage.setItem("companyName", companyName);
+        localStorage.setItem("googleReviewsLink", googleReviewsLink);
+        localStorage.setItem("slug", data.slug);
+      }
+
+      router.push("/send-sms");
+    } catch (err: any) {
+      setError(err.message || "Ett fel uppstod när data skulle sparas");
+      console.error("Error saving data:", err);
+    } finally {
+      setIsLoading(false);
     }
-    router.push("/send-sms");
   };
 
   return (
@@ -76,13 +108,30 @@ export default function OnboardingPage() {
             </p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-primary-500 hover:bg-primary-600 text-white font-semibold text-lg px-6 py-4 rounded-xl transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 flex items-center justify-center gap-2"
+            disabled={isLoading}
+            className="w-full bg-primary-500 hover:bg-primary-600 disabled:bg-primary-400 disabled:cursor-not-allowed text-white font-semibold text-lg px-6 py-4 rounded-xl transition-all duration-200 shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 flex items-center justify-center gap-2"
           >
-            Konfigurera mitt system
-            <ArrowRight className="w-5 h-5" />
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Sparar...
+              </>
+            ) : (
+              <>
+                Konfigurera mitt system
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
           </button>
         </form>
 

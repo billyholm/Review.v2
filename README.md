@@ -43,4 +43,13 @@ npm start
 - `/` - Landing page
 - `/onboarding` - Onboarding-formulär för företagsinformation
 - `/send-sms` - SMS-sändningsformulär
+- `/dashboard` - Dashboard med statistik och översikt över skickade SMS
+
+## Funktioner
+
+- **Telefonnummer-formatering** - Automatisk formatering av svenska telefonnummer
+- **SMS-förhandsgranskning** - Se exakt hur SMS:et kommer att se ut
+- **Dashboard** - Översikt över skickade SMS och statistik
+- **LocalStorage** - Data sparas lokalt i webbläsaren
+- **Responsiv design** - Fungerar på alla enheter
 
